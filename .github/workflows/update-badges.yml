@@ -1,0 +1,52 @@
+name: Update Download Badges
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # nightly at midnight UTC
+  workflow_dispatch: # manual trigger
+
+jobs:
+  update-badges:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout badges branch
+        uses: actions/checkout@v4
+        with:
+          ref: badges
+          fetch-depth: 0
+
+      - name: Fetch HF downloads
+        run: |
+          mkdir -p badges
+
+          RESPONSE=$(curl -s "https://huggingface.co/api/models/Dogacel/Universal-DeepSeek-OCR-2?expand[]=downloadsAllTime")
+          ALL_TIME=$(echo "$RESPONSE" | jq '.downloadsAllTime')
+          MONTHLY=$(echo "$RESPONSE" | jq '.downloads')
+
+          cat > badges/downloads-all-time.json <<EOF
+          {
+            "schemaVersion": 1,
+            "label": "Downloads (All Time)",
+            "message": "$ALL_TIME",
+            "color": "green"
+          }
+          EOF
+
+          cat > badges/downloads-monthly.json <<EOF
+          {
+            "schemaVersion": 1,
+            "label": "Downloads (Monthly)",
+            "message": "$MONTHLY",
+            "color": "green"
+          }
+          EOF
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add badges/
+          git diff --cached --quiet || git commit -m "Update download badges"
+          git push
